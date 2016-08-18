@@ -26,13 +26,17 @@ bool Display_pictQueue_init(struct Display* const d)
 	// YYYYUV Format
 	size_t planeSizeY = d->width * d->height;
 	size_t planeSizeUV = planeSizeY / 4;
+	d->texture = SDL_CreateTexture(d->renderer, SDL_PIXELFORMAT_YV12,
+	                               SDL_TEXTUREACCESS_STREAMING,
+	                               d->width, d->height);
+	if (!d->texture)
+	{
+		SDL_DestroyRenderer(d->renderer);
+		return false;
+	}
 	for (size_t i = 0; i < DISPLAY_PICTQUEUE_SIZE_MAX; ++i)
 	{
 		struct Picture* const p = &d->pictQueue[i];
-		p->texture = SDL_CreateTexture(d->renderer, SDL_PIXELFORMAT_YV12,
-		                               SDL_TEXTUREACCESS_STREAMING,
-		                               d->width, d->height);
-		if (!p->texture) goto fail;
 		p->planeY = malloc(sizeof(*p->planeY) * planeSizeY);
 		p->planeU = malloc(sizeof(*p->planeU) * planeSizeUV);
 		p->planeV = malloc(sizeof(*p->planeV) * planeSizeUV);
@@ -47,10 +51,10 @@ void Display_pictQueue_destroy(struct Display* const d)
 {
 	assert(d);
 	SDL_DestroyRenderer(d->renderer);
+	SDL_DestroyTexture(d->texture);
 	for (size_t i = 0; i < DISPLAY_PICTQUEUE_SIZE_MAX; ++i)
 	{
 		struct Picture* const p = &d->pictQueue[i];
-		SDL_DestroyTexture(p->texture);
 		free(p->planeY);
 		free(p->planeU);
 		free(p->planeV);
@@ -72,15 +76,15 @@ bool Display_pictQueue_write(struct Display* const d)
 }
 void Display_pictQueue_draw(struct Display* const d)
 {
+	assert(d->texture);
 	struct Picture* p = &d->pictQueue[d->pictQueueIR];
-	assert(p->texture);
 	assert(p->planeY && p->planeU && p->planeV);
-	SDL_UpdateYUVTexture(p->texture, NULL,
+	SDL_UpdateYUVTexture(d->texture, NULL,
 	                     p->planeY, d->width,
 	                     p->planeU, d->width / 2,
 	                     p->planeV, d->width / 2);
 	SDL_RenderClear(d->renderer);
-	SDL_RenderCopy(d->renderer, p->texture, NULL, 0);
+	SDL_RenderCopy(d->renderer, d->texture, NULL, 0);
 	SDL_RenderPresent(d->renderer);
 
 	++d->pictQueueIR;

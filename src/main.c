@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <complex.h>
+#include <time.h>
 
 #include <SDL2/SDL.h>
 #include <fftw3.h>
@@ -11,6 +12,117 @@
 
 typedef double real;
 typedef double complex comp;
+
+int calculation_thread(struct Display* const d)
+{
+	// Populate samples
+	size_t const nSamples = 44100;
+	size_t const windowSamples = 2048;
+	real* samples = malloc(sizeof(real) * nSamples);
+	for (size_t i = 0; i < 44100 / 4; ++i)
+	{
+		samples[i] = sin(2 * M_PI * i / 88.2); // 500 Hz
+		samples[i + 44100 / 4] = sin(2 * M_PI * i / 44.1); // 1 kHz
+		samples[i + 2 * 44100 / 4] = sin(2 * M_PI * i / 29.4); // 1.5 kHz
+		samples[i + 3 * 44100 / 4] = sin(2 * M_PI * i / 22.05); // 2 kHz
+	}
+	real* window = malloc(sizeof(real) * windowSamples);
+	// Populate rectangular window
+	for (size_t i = 0; i < windowSamples; ++i)
+	{
+		window[i] = 1.0;
+	}
+	size_t bufferSize = sizeof(real) * windowSamples;
+	real* buffer = fftw_malloc(bufferSize);
+	comp* spectrum = fftw_malloc(sizeof(comp) * windowSamples);
+	fftw_plan plan = fftw_plan_dft_r2c_1d(windowSamples, buffer, spectrum,
+	                                      FFTW_MEASURE);
+
+	fprintf(stdout, "FFTW plan measure complete\n");
+	// Populate the image column by column
+	uint8_t* image = malloc(3 * d->width * d->height * sizeof(uint8_t));
+	size_t const windowRadius = windowSamples / 2;
+
+	clock_t timeStart = clock();
+
+	memset(buffer, 0, bufferSize);
+	for (size_t i = 0; i < nSamples; ++i)
+	{
+		if (i < windowRadius)
+		{
+			memcpy(buffer + windowRadius - i, samples,
+					sizeof(real) * (windowRadius + i));
+		}
+		else if (i + windowRadius > nSamples)
+		{
+			size_t validLength = windowRadius + nSamples - i;
+			buffer[nSamples - i + windowRadius - 1] = 0;
+			memcpy(buffer, samples + i - windowRadius, sizeof(real) * (validLength));
+		}
+		else
+		{
+			memcpy(buffer, samples + i - windowRadius, bufferSize);
+		}
+		fftw_execute(plan);
+		int column = i * d->width / nSamples;
+		for (size_t j = 0; j < windowSamples; ++j)
+		{
+			uint8_t amplitude = (uint8_t) cabs(spectrum[j] * 255.0);
+			int row = j * d->height / windowSamples;
+			int base = (column + row * d->width) * 3;
+			image[base + 0] = amplitude;
+			image[base + 1] = amplitude;
+			image[base + 2] = amplitude;
+		}
+	}
+
+	clock_t timeDiff = (clock() - timeStart) * 1000 / CLOCKS_PER_SEC;
+	fprintf(stdout, "Time elapsed: %ld ms\n", timeDiff);
+
+	fftw_destroy_plan(plan);
+	//fftw_free(spectrum);
+	//fftw_free(buffer);
+	free(samples);
+	free(window);
+
+	// Convert image to YUV
+	uint8_t const* dataIn[3];
+	int linesizeIn[3];
+
+	uint8_t* dataOut[3];
+	int linesizeOut[3];
+
+	{
+		dataIn[0] = dataIn[1] = dataIn[2] = image;
+		linesizeIn[0] = linesizeIn[1] = linesizeIn[2] = d->width * 3;
+		size_t pitchUV = d->width / 2;
+		linesizeOut[0] = d->width;
+		linesizeOut[1] = pitchUV;
+		linesizeOut[2] = pitchUV;
+	}
+	while (true)
+	{
+		if (!Display_pictQueue_write(d)) break;
+		struct Picture* p = &d->pictQueue[d->pictQueueIW];
+		dataOut[0] = p->planeY;
+		dataOut[1] = p->planeU;
+		dataOut[2] = p->planeV;
+
+		sws_scale(d->swsContext,
+		          dataIn, linesizeIn, 0, d->height,
+		          dataOut, linesizeOut);
+
+		++d->pictQueueIW;
+		if (d->pictQueueIW == DISPLAY_PICTQUEUE_SIZE_MAX)
+			d->pictQueueIW = 0;
+		SDL_LockMutex(d->pictQueueMutex);
+		++d->pictQueueSize;
+		SDL_UnlockMutex(d->pictQueueMutex);
+	}
+
+	free(image);
+	return 0;
+}
 
 #define EVENT_REFRESH (SDL_USEREVENT + 2)
 
@@ -40,59 +152,6 @@ void refresh(struct Display* const d)
 		Display_pictQueue_draw(d);
 	}
 }
-int calculation_thread(struct Display* const d)
-{
-	uint8_t* image = malloc(3 * d->width * d->height * sizeof(uint8_t));
-	int checkerSize = 50;
-	for (int i = 0; i < d->width; ++i)
-	{
-		bool flip = (i / checkerSize) & 1;
-		for (int j = 0; j < d->height; ++j)
-		{
-			bool check = flip != ((j / checkerSize) & 1);
-			int base = (i + j * d->width) * 3;
-			image[base + 0] = check ? 255 : 0;
-			image[base + 1] = check ? 255 : 0;
-			image[base + 2] = check ? 255 : 0;
-		}
-	}
-
-	// Convert image to YUV
-	uint8_t const* dataIn[3];
-	dataIn[0] = dataIn[1] = dataIn[2] = image;
-	int linesizeIn[3];
-	linesizeIn[0] = linesizeIn[1] = linesizeIn[2] = d->width * 3;
-
-	uint8_t* dataOut[3];
-	int linesizeOut[3];
-	size_t pitchUV = d->width / 2;
-	linesizeOut[0] = d->width;
-	linesizeOut[1] = pitchUV;
-	linesizeOut[2] = pitchUV;
-
-	while (true)
-	{
-		if (!Display_pictQueue_write(d)) break;
-		struct Picture* p = &d->pictQueue[d->pictQueueIW];
-		dataOut[0] = p->planeY;
-		dataOut[1] = p->planeU;
-		dataOut[2] = p->planeV;
-
-		sws_scale(d->swsContext,
-		          dataIn, linesizeIn, 0, d->height,
-		          dataOut, linesizeOut);
-
-		++d->pictQueueIW;
-		if (d->pictQueueIW == DISPLAY_PICTQUEUE_SIZE_MAX)
-			d->pictQueueIW = 0;
-		SDL_LockMutex(d->pictQueueMutex);
-		++d->pictQueueSize;
-		SDL_UnlockMutex(d->pictQueueMutex);
-	}
-
-	free(image);
-	return 0;
-}
 
 bool test()
 {
@@ -104,8 +163,7 @@ bool test()
 	display.window =
 	  SDL_CreateWindow("Spectrogen",
 	                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-	                   display.width, display.height, SDL_WINDOW_RESIZABLE);
-	display.renderer = SDL_CreateRenderer(display.window, -1, 0);
+	                   display.width, display.height, 0);
 	display.swsContext = sws_getContext(display.width, display.height,
 	                                    AV_PIX_FMT_RGB24,
 	                                    display.width, display.height,

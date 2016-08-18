@@ -9,7 +9,6 @@
 
 struct Picture
 {
-	SDL_Texture* texture;
 	uint8_t* planeY;
 	uint8_t* planeU;
 	uint8_t* planeV;
@@ -26,6 +25,7 @@ struct Display
 	int height;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
+	SDL_Texture* texture;
 	struct SwsContext* swsContext;
 
 	struct Picture pictQueue[DISPLAY_PICTQUEUE_SIZE_MAX];
