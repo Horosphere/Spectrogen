@@ -58,7 +58,7 @@ int calculation_thread(struct Display* const d)
 	}
 
 	// Convert image to YUV
-	uint8_t* dataIn[3];
+	uint8_t const* dataIn[3];
 	dataIn[0] = dataIn[1] = dataIn[2] = image;
 	int linesizeIn[3];
 	linesizeIn[0] = linesizeIn[1] = linesizeIn[2] = d->width * 3;
@@ -79,7 +79,7 @@ int calculation_thread(struct Display* const d)
 		dataOut[2] = p->planeV;
 
 		sws_scale(d->swsContext,
-		          (uint8_t const* const*) dataIn, linesizeIn, 0, d->height,
+		          dataIn, linesizeIn, 0, d->height,
 		          dataOut, linesizeOut);
 
 		++d->pictQueueIW;
@@ -104,7 +104,7 @@ bool test()
 	display.window =
 	  SDL_CreateWindow("Spectrogen",
 	                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-	                   display.width, display.height, 0);
+	                   display.width, display.height, SDL_WINDOW_RESIZABLE);
 	display.renderer = SDL_CreateRenderer(display.window, -1, 0);
 	display.swsContext = sws_getContext(display.width, display.height,
 	                                    AV_PIX_FMT_RGB24,

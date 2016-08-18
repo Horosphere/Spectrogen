@@ -15,12 +15,14 @@ void Display_destroy(struct Display* const d)
 	SDL_DestroyMutex(d->pictQueueMutex);
 	SDL_DestroyCond(d->pictQueueCond);
 	sws_freeContext(d->swsContext);
+	SDL_DestroyWindow(d->window);
 }
 bool Display_pictQueue_init(struct Display* const d)
 {
 	assert(d);
-	assert(d->renderer);
+	assert(d->window);
 	assert(d->width != 0 && d->height != 0);
+	d->renderer = SDL_CreateRenderer(d->window, -1, 0);
 	// YYYYUV Format
 	size_t planeSizeY = d->width * d->height;
 	size_t planeSizeUV = planeSizeY / 4;
@@ -44,6 +46,7 @@ fail:
 void Display_pictQueue_destroy(struct Display* const d)
 {
 	assert(d);
+	SDL_DestroyRenderer(d->renderer);
 	for (size_t i = 0; i < DISPLAY_PICTQUEUE_SIZE_MAX; ++i)
 	{
 		struct Picture* const p = &d->pictQueue[i];

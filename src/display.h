@@ -42,10 +42,12 @@ void Display_init(struct Display* const);
 void Display_destroy(struct Display* const);
 /**
  * Render thread only
+ * @brief Initialises the pictQueue and renderer.
  */
 bool Display_pictQueue_init(struct Display* const);
 /**
  * Render thread only
+ * @brief Frees the pictQueue and renderer
  */
 void Display_pictQueue_destroy(struct Display* const);
 /**
