@@ -1,137 +1,12 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#include <math.h>
-#include <complex.h>
-#include <time.h>
-
-#include <SDL2/SDL.h>
-#include <fftw3.h>
 
 #include "display.h"
 #include "fourier.h"
+#include "staticsample.h"
 
 
-int calculation_thread(struct Display* const d)
-{
-	// Populate samples
-	size_t const nSamples = 44100;
-	size_t const windowSamples = 1536;
-	size_t const windowRadius = windowSamples / 2;
-	real* samples = malloc(sizeof(real) * nSamples);
-	for (size_t i = 0; i < 44100 / 4; ++i)
-	{
-		samples[i] = sin(2 * M_PI * i / 88.2); // 500 Hz
-		samples[i + 44100 / 4] = sin(2 * M_PI * i / 22.05); // 2 kHz
-		samples[i + 2 * 44100 / 4] = sin(2 * M_PI * i / 7.35); // 6 kHz
-		samples[i + 3 * 44100 / 4] = sin(2 * M_PI * i / 2.01); //  22.05 kHz
-	}
-	real* window = malloc(sizeof(real) * windowSamples);
-	window_gaussian(window, windowSamples, 8.0);
-
-	size_t bufferSize = sizeof(real) * windowSamples;
-	real* buffer = fftw_malloc(bufferSize);
-	comp* spectrum = fftw_malloc(sizeof(comp) * (windowRadius + 1));
-	fftw_plan plan = fftw_plan_dft_r2c_1d(windowSamples, buffer, spectrum,
-	                                      FFTW_MEASURE);
-
-	fprintf(stdout, "FFTW plan measure complete\n");
-	// Populate the image column by column
-	uint8_t* image = malloc(3 * d->width * d->height * sizeof(uint8_t));
-
-	clock_t timeStart = clock();
-
-	memset(buffer, 0, bufferSize);
-	for (int col = 0; col < d->width; ++col)
-	{
-		size_t i = col * nSamples / d->width;
-		if (i < windowRadius)
-		{
-			memcpy(buffer + windowRadius - i, samples,
-			       sizeof(real) * (windowRadius + i));
-		}
-		else if (i + windowRadius > nSamples)
-		{
-			size_t validLength = windowRadius + nSamples - i;
-			buffer[nSamples - i + windowRadius - 1] = 0;
-			memcpy(buffer, samples + i - windowRadius, sizeof(real) * validLength);
-		}
-		else
-		{
-			memcpy(buffer, samples + i - windowRadius, sizeof(real) * windowSamples);
-		}
-		convolve(buffer, window, windowSamples);
-		fftw_execute(plan);
-
-		for (int row = 0; row < d->height; ++row)
-		{
-			/*
-			 * (d->height - row) flips the spectrogram upside down
-			 * a linear map casts [0, d->height] to [0, windowRadius]. The +1 avoids
-			 * the constant term and allows the highest component of frequency to be
-			 * shown.
-			 */
-			size_t j = (d->height - row) * windowRadius / d->height + 1;
-			/*
-			 * Must multiply amplitude by 2 so maximum amplitude is 1
-			 */
-			double amplitude = cabs(spectrum[j]) * 2;
-
-			uint8_t colour = (uint8_t) 255 * amplitude;
-			int pixel = (col + row * d->width) * 3;
-			image[pixel + 0] = colour;
-			image[pixel + 1] = colour;
-			image[pixel + 2] = colour;
-		}
-	}
-
-	clock_t timeDiff = (clock() - timeStart) * 1000 / CLOCKS_PER_SEC;
-	fprintf(stdout, "Time elapsed: %ld ms\n", timeDiff);
-
-	fftw_destroy_plan(plan);
-	//fftw_free(spectrum);
-	//fftw_free(buffer);
-	free(samples);
-	free(window);
-
-	// Convert image to YUV
-	uint8_t const* dataIn[3];
-	int linesizeIn[3];
-
-	uint8_t* dataOut[3];
-	int linesizeOut[3];
-
-	{
-		dataIn[0] = dataIn[1] = dataIn[2] = image;
-		linesizeIn[0] = linesizeIn[1] = linesizeIn[2] = d->width * 3;
-		size_t pitchUV = d->width / 2;
-		linesizeOut[0] = d->width;
-		linesizeOut[1] = pitchUV;
-		linesizeOut[2] = pitchUV;
-	}
-	while (true)
-	{
-		if (!Display_pictQueue_write(d)) break;
-		struct Picture* p = &d->pictQueue[d->pictQueueIW];
-		dataOut[0] = p->planeY;
-		dataOut[1] = p->planeU;
-		dataOut[2] = p->planeV;
-
-		sws_scale(d->swsContext,
-		          dataIn, linesizeIn, 0, d->height,
-		          dataOut, linesizeOut);
-
-		++d->pictQueueIW;
-		if (d->pictQueueIW == DISPLAY_PICTQUEUE_SIZE_MAX)
-			d->pictQueueIW = 0;
-		SDL_LockMutex(d->pictQueueMutex);
-		++d->pictQueueSize;
-		SDL_UnlockMutex(d->pictQueueMutex);
-	}
-
-	free(image);
-	return 0;
-}
 
 #define EVENT_REFRESH (SDL_USEREVENT + 2)
 
@@ -162,13 +37,114 @@ void refresh(struct Display* const d)
 	}
 }
 
-bool test()
+int main(int argc, char* argv[])
 {
+	(void) argc;
+	(void) argv;
+
+	// Initialisation
+
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER))
+	{
+		fprintf(stderr, "[SDL] %s\n", SDL_GetError());
+		return -1;
+	}
 	struct Display display;
-	bool flag = false;
 	Display_init(&display);
 	display.width = 640;
 	display.height = 480;
+
+	enum
+	{
+		WINDOW_RECT,
+		WINDOW_TRI,
+		WINDOW_GAUSSIAN,
+		WINDOW_EXPCAUSAL
+	} windowType = WINDOW_GAUSSIAN;
+	real windowVar = 6.0;
+
+	struct DSTFT dstft;
+	memset(&dstft, 0, sizeof(struct DSTFT));
+	dstft.windowWidth = 1536;
+	char const* file = NULL;
+
+	// Command line parser
+	char** arg= argv;
+	char** argEnd= arg + argc;
+
+	// Help
+	if (argc == 2 && strcmp(argv[1], "--help") == 0)
+	{
+		printf("Usage:\n"
+		       "--dim WIDTH HEIGHT: Dimensions of the output window\n"
+		       "--window TYPE WIDTH VAR: Specs of the window function\n"
+		       "    TYPE: Can have the value 'rect', 'tri', 'gauss', 'expc'\n"
+		       "    WIDTH: Number of samples for the window.\n"
+		       "    VAR: Higher var indicates a narrower window. Ignored for rect"
+		       " and tri types\n"
+		       "--file FILENAME: Read samples from a file\n"
+		      );
+		return 1;
+	}
+	while (++arg != argEnd)
+	{
+		if (strcmp(*arg, "--dim") == 0)
+		{
+			if (++arg == argEnd || *arg[0] == '-')
+			{
+				fprintf(stderr, "Two numbers must be supplied after --dim\n");
+				return -1;
+			}
+			display.width = atoi(*arg);
+			if (++arg == argEnd || *arg[0] == '-')
+			{
+				fprintf(stderr, "Two numbers must be supplied after --dim\n");
+				return -1;
+			}
+			display.height = atoi(*arg);
+		}
+		else if (strcmp(*arg, "--window") == 0)
+		{
+			if (++arg == argEnd || *arg[0] == '-')
+			{
+				fprintf(stderr, "Window type must be supplied after --window\n");
+				return -1;
+			}
+			if (strcmp(*arg, "rect") == 0)
+				windowType = WINDOW_RECT;
+			else if (strcmp(*arg, "tri") == 0)
+				windowType = WINDOW_TRI;
+			else if (strcmp(*arg, "gauss") == 0)
+				windowType = WINDOW_GAUSSIAN;
+			else if (strcmp(*arg, "expc") == 0)
+				windowType = WINDOW_EXPCAUSAL;
+			else
+			{
+				fprintf(stderr, "Unrecognised window type\n");
+				return -1;
+			}
+			if (++arg == argEnd || *arg[0] == '-') break;
+			dstft.windowWidth = atof(*arg);
+			if (++arg == argEnd || *arg[0] == '-') break;
+			windowVar = atof(*arg);
+		}
+		else if (strcmp(*arg, "--file") == 0)
+		{
+			if (++arg == argEnd)
+			{
+				fprintf(stderr, "A file name must be provided after --file\n");
+				return -1;
+			}
+			file = *arg;
+		}
+		else
+		{
+			fprintf(stderr, "Unknown argument\n");
+			return -1;
+		}
+	}
+
+	// Parsing complete. Populate fields
 	display.window =
 	  SDL_CreateWindow("Spectrogen",
 	                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -181,56 +157,29 @@ bool test()
 
 	Display_pictQueue_init(&display);
 
-	SDL_Thread* threadCalculation
-	  = SDL_CreateThread((SDL_ThreadFunction) calculation_thread,
-	                     "calculation", &display);
-	if (!threadCalculation)
+	DSTFT_init(&dstft);
+	switch (windowType)
 	{
-		fprintf(stderr, "[SDL] %s\n", SDL_GetError());
-		goto finish;
+	case WINDOW_RECT:
+		window_rect(dstft.window, dstft.windowWidth);
+		break;
+	case WINDOW_TRI:
+		window_tri(dstft.window, dstft.windowWidth);
+		break;
+	case WINDOW_GAUSSIAN:
+		window_gaussian(dstft.window, dstft.windowWidth, windowVar);
+		break;
+	case WINDOW_EXPCAUSAL:
+		window_exponential_causal(dstft.window, dstft.windowWidth, windowVar);
+		break;
 	}
 
-	schedule_refresh(&display, 40);
-	while (true)
-	{
-		SDL_Event event;
-		SDL_WaitEvent(&event);
-		switch (event.type)
-		{
-		case SDL_QUIT:
-			display.quit = true;
-			flag = true;
-			goto finish;
-			break;
-		case EVENT_REFRESH:
-			refresh(event.user.data1);
-			break;
-		default:
-			break;
-		}
-	}
+	static_sample_exec(&display, file, &dstft);
 
-finish:
+	// Clean up
+	DSTFT_destroy(&dstft);
 	Display_pictQueue_destroy(&display);
 	Display_destroy(&display);
-	return flag;
-};
-
-int main(int argc, char* argv[])
-{
-	(void) argc;
-	(void) argv;
-
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER))
-	{
-		fprintf(stderr, "[SDL] %s\n", SDL_GetError());
-		return -1;
-	}
-	if (!test())
-	{
-		fprintf(stderr, "Test routine failed\n");
-		return -1;
-	}
 	SDL_Quit();
 	return 0;
 }

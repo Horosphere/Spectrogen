@@ -15,19 +15,38 @@ typedef double complex comp;
 
 // All window functions result in a window with energy 1
 
-void window_rect(real* const, size_t windowSize);
-
+void window_rect(real* const, size_t n);
+void window_tri(real* const, size_t n);
 /**
  * @brief Fills the window with Gaussian filter
- * @param[out] window An array with size windowSize
- * @param[in] windowSize
+ * @param[out] window An array with size n
+ * @param[in] n Size of the window
  * @param[in] var Higher var results in a more narrow window
  */
-void window_gaussian(real* const window, size_t windowSize, real var);
+void window_gaussian(real* const window, size_t n, real var);
+
+void window_exponential_causal(real* const window, size_t n, real var);
 /**
  * @brief Convolves the window with sample. Result will be stored in samples
  */
 void convolve(real* samples, real const* window, size_t n);
+
+struct DSTFT
+{
+	size_t windowWidth;
+
+	// Populated by DSTFT_init
+	size_t windowRadius;
+	real* window;
+	real* buffer;
+	comp* spectrum;
+	fftw_plan plan;
+};
 		
+/**
+ * Must be called after windowWidth is initialised
+ */
+void DSTFT_init(struct DSTFT* const);
+void DSTFT_destroy(struct DSTFT* const);
 
 #endif // !SPECTROGEN__FOURIER_H_
