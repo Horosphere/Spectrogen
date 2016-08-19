@@ -18,13 +18,14 @@ int calculation_thread(struct Display* const d)
 	// Populate samples
 	size_t const nSamples = 44100;
 	size_t const windowSamples = 2048;
+	size_t const windowRadius = windowSamples / 2;
 	real* samples = malloc(sizeof(real) * nSamples);
 	for (size_t i = 0; i < 44100 / 4; ++i)
 	{
 		samples[i] = sin(2 * M_PI * i / 88.2); // 500 Hz
-		samples[i + 44100 / 4] = sin(2 * M_PI * i / 44.1); // 1 kHz
-		samples[i + 2 * 44100 / 4] = sin(2 * M_PI * i / 29.4); // 1.5 kHz
-		samples[i + 3 * 44100 / 4] = sin(2 * M_PI * i / 22.05); // 2 kHz
+		samples[i + 44100 / 4] = sin(2 * M_PI * i / 22.05); // 2 kHz
+		samples[i + 2 * 44100 / 4] = sin(2 * M_PI * i / 7.35); // 6 kHz
+		samples[i + 3 * 44100 / 4] = sin(2 * M_PI * i / 3.675); // 12 kHz
 	}
 	real* window = malloc(sizeof(real) * windowSamples);
 	// Populate rectangular window
@@ -34,14 +35,13 @@ int calculation_thread(struct Display* const d)
 	}
 	size_t bufferSize = sizeof(real) * windowSamples;
 	real* buffer = fftw_malloc(bufferSize);
-	comp* spectrum = fftw_malloc(sizeof(comp) * windowSamples);
+	comp* spectrum = fftw_malloc(sizeof(comp) * (windowRadius + 1));
 	fftw_plan plan = fftw_plan_dft_r2c_1d(windowSamples, buffer, spectrum,
 	                                      FFTW_MEASURE);
 
 	fprintf(stdout, "FFTW plan measure complete\n");
 	// Populate the image column by column
 	uint8_t* image = malloc(3 * d->width * d->height * sizeof(uint8_t));
-	size_t const windowRadius = windowSamples / 2;
 
 	clock_t timeStart = clock();
 
@@ -65,14 +65,15 @@ int calculation_thread(struct Display* const d)
 		}
 		fftw_execute(plan);
 		int column = i * d->width / nSamples;
-		for (size_t j = 0; j < windowSamples; ++j)
+		for (size_t j = 0; j < windowRadius + 1; ++j)
 		{
-			uint8_t amplitude = (uint8_t) cabs(spectrum[j] * 255.0);
-			int row = j * d->height / windowSamples;
+			double amplitude = cabs(spectrum[j]) / windowRadius;
+			uint8_t a = (uint8_t) 255 * amplitude;
+			int row = d->height - j * d->height / (windowRadius + 1);
 			int base = (column + row * d->width) * 3;
-			image[base + 0] = amplitude;
-			image[base + 1] = amplitude;
-			image[base + 2] = amplitude;
+			image[base + 0] = a;
+			image[base + 1] = a;
+			image[base + 2] = a;
 		}
 	}
 
