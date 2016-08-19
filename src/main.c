@@ -9,15 +9,14 @@
 #include <fftw3.h>
 
 #include "display.h"
+#include "fourier.h"
 
-typedef double real;
-typedef double complex comp;
 
 int calculation_thread(struct Display* const d)
 {
 	// Populate samples
 	size_t const nSamples = 44100;
-	size_t const windowSamples = 2048;
+	size_t const windowSamples = 1536;
 	size_t const windowRadius = windowSamples / 2;
 	real* samples = malloc(sizeof(real) * nSamples);
 	for (size_t i = 0; i < 44100 / 4; ++i)
@@ -25,14 +24,11 @@ int calculation_thread(struct Display* const d)
 		samples[i] = sin(2 * M_PI * i / 88.2); // 500 Hz
 		samples[i + 44100 / 4] = sin(2 * M_PI * i / 22.05); // 2 kHz
 		samples[i + 2 * 44100 / 4] = sin(2 * M_PI * i / 7.35); // 6 kHz
-		samples[i + 3 * 44100 / 4] = sin(2 * M_PI * i / 3.675); // 12 kHz
+		samples[i + 3 * 44100 / 4] = sin(2 * M_PI * i / 2.01); //  22.05 kHz
 	}
 	real* window = malloc(sizeof(real) * windowSamples);
-	// Populate rectangular window
-	for (size_t i = 0; i < windowSamples; ++i)
-	{
-		window[i] = 1.0;
-	}
+	window_gaussian(window, windowSamples, 8.0);
+
 	size_t bufferSize = sizeof(real) * windowSamples;
 	real* buffer = fftw_malloc(bufferSize);
 	comp* spectrum = fftw_malloc(sizeof(comp) * (windowRadius + 1));
@@ -46,34 +42,46 @@ int calculation_thread(struct Display* const d)
 	clock_t timeStart = clock();
 
 	memset(buffer, 0, bufferSize);
-	for (size_t i = 0; i < nSamples; ++i)
+	for (int col = 0; col < d->width; ++col)
 	{
+		size_t i = col * nSamples / d->width;
 		if (i < windowRadius)
 		{
 			memcpy(buffer + windowRadius - i, samples,
-					sizeof(real) * (windowRadius + i));
+			       sizeof(real) * (windowRadius + i));
 		}
 		else if (i + windowRadius > nSamples)
 		{
 			size_t validLength = windowRadius + nSamples - i;
 			buffer[nSamples - i + windowRadius - 1] = 0;
-			memcpy(buffer, samples + i - windowRadius, sizeof(real) * (validLength));
+			memcpy(buffer, samples + i - windowRadius, sizeof(real) * validLength);
 		}
 		else
 		{
-			memcpy(buffer, samples + i - windowRadius, bufferSize);
+			memcpy(buffer, samples + i - windowRadius, sizeof(real) * windowSamples);
 		}
+		convolve(buffer, window, windowSamples);
 		fftw_execute(plan);
-		int column = i * d->width / nSamples;
-		for (size_t j = 0; j < windowRadius + 1; ++j)
+
+		for (int row = 0; row < d->height; ++row)
 		{
-			double amplitude = cabs(spectrum[j]) / windowRadius;
-			uint8_t a = (uint8_t) 255 * amplitude;
-			int row = d->height - j * d->height / (windowRadius + 1);
-			int base = (column + row * d->width) * 3;
-			image[base + 0] = a;
-			image[base + 1] = a;
-			image[base + 2] = a;
+			/*
+			 * (d->height - row) flips the spectrogram upside down
+			 * a linear map casts [0, d->height] to [0, windowRadius]. The +1 avoids
+			 * the constant term and allows the highest component of frequency to be
+			 * shown.
+			 */
+			size_t j = (d->height - row) * windowRadius / d->height + 1;
+			/*
+			 * Must multiply amplitude by 2 so maximum amplitude is 1
+			 */
+			double amplitude = cabs(spectrum[j]) * 2;
+
+			uint8_t colour = (uint8_t) 255 * amplitude;
+			int pixel = (col + row * d->width) * 3;
+			image[pixel + 0] = colour;
+			image[pixel + 1] = colour;
+			image[pixel + 2] = colour;
 		}
 	}
 

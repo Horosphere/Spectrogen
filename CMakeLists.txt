@@ -17,6 +17,7 @@ set(FFTW_LIBRARIES "${FFTW_LIBRARY}")
 set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/display.c
     ${PROJECT_SOURCE_DIR}/main.c
+    ${PROJECT_SOURCE_DIR}/fourier.c
    )
 # Auto-generated end
 
