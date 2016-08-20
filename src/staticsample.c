@@ -11,6 +11,7 @@
 #include <fftw3.h>
 
 #include "display.h"
+#include "spectrogram.h"
 
 
 bool static_sample_exec(struct Display* const d,
@@ -79,49 +80,9 @@ bool static_sample_exec(struct Display* const d,
 	uint8_t* image = malloc(3 * d->width * d->height * sizeof(uint8_t));
 
 	clock_t timeStart = clock();
-	for (int col = 0; col < d->width; ++col)
-	{
-		size_t i = col * nSamples / d->width;
-		if (i < dstft->windowRadius)
-		{
-			memcpy(dstft->buffer + dstft->windowRadius - i, samples,
-			       sizeof(real) * (dstft->windowRadius + i));
-		}
-		else if (i + dstft->windowRadius > nSamples)
-		{
-			dstft->buffer[nSamples - i + dstft->windowRadius - 1] = 0;
-			memcpy(dstft->buffer, samples + i - dstft->windowRadius,
-			       sizeof(real) * (dstft->windowRadius + nSamples - i));
-		}
-		else
-		{
-			memcpy(dstft->buffer, samples + i - dstft->windowRadius,
-					sizeof(real) * dstft->windowWidth);
-		}
-		convolve(dstft->buffer, dstft->window, dstft->windowWidth);
-		fftw_execute(dstft->plan);
+	spectrogram_populate(image, d->width, d->height,
+			samples, nSamples, dstft);
 
-		for (int row = 0; row < d->height; ++row)
-		{
-			/*
-			 * (d->height - row) flips the spectrogram upside down
-			 * a linear map casts [0, d->height] to [0, windowRadius]. The +1 avoids
-			 * the constant term and allows the highest component of frequency to be
-			 * shown.
-			 */
-			size_t j = (d->height - row) * dstft->windowRadius / d->height + 1;
-			/*
-			 * Must multiply amplitude by 2 so maximum amplitude is 1
-			 */
-			double amplitude = cabs(dstft->spectrum[j]) * 2;
-
-			uint8_t colour = (uint8_t) 255 * amplitude;
-			int pixel = (col + row * d->width) * 3;
-			image[pixel + 0] = colour;
-			image[pixel + 1] = colour;
-			image[pixel + 2] = colour;
-		}
-	}
 	clock_t timeDiff = (clock() - timeStart) * 1000 / CLOCKS_PER_SEC;
 	fprintf(stdout, "Time elapsed: %ld ms\n", timeDiff);
 

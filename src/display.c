@@ -96,3 +96,29 @@ void Display_pictQueue_draw(struct Display* const d)
 	SDL_UnlockMutex(d->pictQueueMutex);
 }
 
+uint32_t refresh_timer(uint32_t interval, void* data)
+{
+	(void) interval;
+	SDL_Event event;
+	event.type = EVENT_REFRESH;
+	event.user.data1 = data;
+	SDL_PushEvent(&event);
+	return 0;
+}
+void schedule_refresh(void* data, int delay)
+{
+	if (!SDL_AddTimer(delay, refresh_timer, data))
+	{
+		fprintf(stderr, "[SDL] %s\n", SDL_GetError());
+	}
+}
+void refresh(struct Display* const d)
+{
+	if (d->pictQueueSize == 0)
+		schedule_refresh(d, 1);
+	else
+	{
+		schedule_refresh(d, 40);
+		Display_pictQueue_draw(d);
+	}
+}

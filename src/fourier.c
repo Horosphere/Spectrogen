@@ -64,6 +64,7 @@ void DSTFT_init(struct DSTFT* const d)
 	d->spectrum = fftw_malloc(sizeof(comp) * (d->windowRadius + 1));
 	d->plan = fftw_plan_dft_r2c_1d(d->windowWidth, d->buffer, d->spectrum,
 	                               FFTW_MEASURE);
+	memset(d->buffer, 0, sizeof(real) * d->windowWidth);
 }
 void DSTFT_destroy(struct DSTFT* const d)
 {

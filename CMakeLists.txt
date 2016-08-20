@@ -16,9 +16,12 @@ set(FFTW_LIBRARIES "${FFTW_LIBRARY}")
 # Auto-generated. Do not edit. All changes will be undone
 set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/staticsample.c
+    ${PROJECT_SOURCE_DIR}/arrayqueue.c
     ${PROJECT_SOURCE_DIR}/display.c
     ${PROJECT_SOURCE_DIR}/main.c
+    ${PROJECT_SOURCE_DIR}/spectrogram.c
     ${PROJECT_SOURCE_DIR}/fourier.c
+    ${PROJECT_SOURCE_DIR}/record.c
    )
 # Auto-generated end
 
@@ -28,3 +31,4 @@ target_link_libraries(Spectrogen m)
 target_link_libraries(Spectrogen SDL2)
 target_link_libraries(Spectrogen avutil swscale)
 target_link_libraries(Spectrogen fftw3)
+target_link_libraries(Spectrogen portaudio)

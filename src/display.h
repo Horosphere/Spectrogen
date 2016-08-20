@@ -61,4 +61,8 @@ bool Display_pictQueue_write(struct Display* const);
  */
 void Display_pictQueue_draw(struct Display* const);
 
+#define EVENT_REFRESH (SDL_USEREVENT + 2)
+
+void schedule_refresh(void* data, int delay);
+void refresh(struct Display* const d);
 #endif // !SPECTROGEN__DISPLAY_H_

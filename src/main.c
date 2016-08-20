@@ -5,37 +5,8 @@
 #include "display.h"
 #include "fourier.h"
 #include "staticsample.h"
+#include "record.h"
 
-
-
-#define EVENT_REFRESH (SDL_USEREVENT + 2)
-
-uint32_t refresh_timer(uint32_t interval, void* data)
-{
-	(void) interval;
-	SDL_Event event;
-	event.type = EVENT_REFRESH;
-	event.user.data1 = data;
-	SDL_PushEvent(&event);
-	return 0;
-}
-void schedule_refresh(void* data, int delay)
-{
-	if (!SDL_AddTimer(delay, refresh_timer, data))
-	{
-		fprintf(stderr, "[SDL] %s\n", SDL_GetError());
-	}
-}
-void refresh(struct Display* const d)
-{
-	if (d->pictQueueSize == 0)
-		schedule_refresh(d, 1);
-	else
-	{
-		schedule_refresh(d, 40);
-		Display_pictQueue_draw(d);
-	}
-}
 
 int main(int argc, char* argv[])
 {
@@ -54,6 +25,11 @@ int main(int argc, char* argv[])
 	display.width = 640;
 	display.height = 480;
 
+	enum
+	{
+		ROUTINE_STATIC,
+		ROUTINE_RECORD
+	} routineType = ROUTINE_RECORD;
 	enum
 	{
 		WINDOW_RECT,
@@ -76,13 +52,19 @@ int main(int argc, char* argv[])
 	if (argc == 2 && strcmp(argv[1], "--help") == 0)
 	{
 		printf("Usage:\n"
+		       "Spectrogram specifications:\n"
 		       "--dim WIDTH HEIGHT: Dimensions of the output window\n"
 		       "--window TYPE WIDTH VAR: Specs of the window function\n"
 		       "    TYPE: Can have the value 'rect', 'tri', 'gauss', 'expc'\n"
 		       "    WIDTH: Number of samples for the window.\n"
 		       "    VAR: Higher var indicates a narrower window. Ignored for rect"
 		       " and tri types\n"
-		       "--file FILENAME: Read samples from a file\n"
+		       "Modes:\n"
+		       "(NO FLAG): Accept input from the microphone\n"
+		       "--file FILENAME: Read samples from a file. The first line must be"
+		       " the number of samples, with sample values following on separate"
+		       " lines\n"
+		       "--default: Use a set of default generated samples\n"
 		      );
 		return 1;
 	}
@@ -124,7 +106,12 @@ int main(int argc, char* argv[])
 				return -1;
 			}
 			if (++arg == argEnd || *arg[0] == '-') break;
-			dstft.windowWidth = atof(*arg);
+			dstft.windowWidth = atol(*arg);
+			if (dstft.windowWidth == 0)
+			{
+				fprintf(stderr, "Invalid window width");
+				return -1;
+			}
 			if (++arg == argEnd || *arg[0] == '-') break;
 			windowVar = atof(*arg);
 		}
@@ -136,6 +123,12 @@ int main(int argc, char* argv[])
 				return -1;
 			}
 			file = *arg;
+			routineType = ROUTINE_STATIC;
+		}
+		else if (strcmp(*arg, "--default") == 0)
+		{
+			file = NULL;
+			routineType = ROUTINE_STATIC;
 		}
 		else
 		{
@@ -174,7 +167,15 @@ int main(int argc, char* argv[])
 		break;
 	}
 
-	static_sample_exec(&display, file, &dstft);
+	switch (routineType)
+	{
+	case ROUTINE_STATIC:
+		static_sample_exec(&display, file, &dstft);
+		break;
+	case ROUTINE_RECORD:
+		record_exec(&display, &dstft);
+		break;
+	}
 
 	// Clean up
 	DSTFT_destroy(&dstft);
