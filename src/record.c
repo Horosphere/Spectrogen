@@ -29,7 +29,8 @@ int record_callback(float const* input, void* output, unsigned long nFrames,
 	}
 	else
 	{
-		memmove(sa->samples, sa->samples + nFrames, sa->nSamples - nFrames);
+		memmove(sa->samples, sa->samples + nFrames,
+		        sizeof(real) * (sa->nSamples - nFrames));
 		for (size_t i = 0; i < nFrames; ++i)
 		{
 			sa->samples[i + sa->nSamples - nFrames] = (real) input[i];
@@ -101,6 +102,7 @@ void record_exec(struct Display* const d, struct DSTFT* const dstft)
 	(void) dstft;
 
 	fprintf(stdout, "Recording spectrogram\n");
+
 
 	struct SampleArray sa;
 	sa.nSamples = 144000; // 2 secs
