@@ -1,6 +1,7 @@
 #include "spectrogram.h"
 
 #include <string.h>
+#include <assert.h>
 #include <math.h>
 
 void spectrogram_populate(uint8_t* const image, int width, int height,
@@ -9,6 +10,8 @@ void spectrogram_populate(uint8_t* const image, int width, int height,
                           struct ColourGradient const* const grad,
                           struct DSTFT* const dstft)
 {
+	assert(nSamples >= dstft->windowWidth);
+
 	memset(dstft->buffer, 0, sizeof(real) * dstft->windowWidth);
 
 	size_t n = crop ? nSamples - dstft->windowWidth : nSamples;
@@ -27,7 +30,7 @@ void spectrogram_populate(uint8_t* const image, int width, int height,
 			memcpy(dstft->buffer + dstft->windowRadius - i, samples,
 			       sizeof(real) * (dstft->windowRadius + i));
 		}
-		else // if (i + dstft->windowRadius > nSamples)
+		else if (i + dstft->windowRadius > nSamples)
 		{
 			memset(dstft->buffer + dstft->windowRadius + nSamples - i, 0,
 			       sizeof(real) * (dstft->windowRadius + i - nSamples));

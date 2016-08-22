@@ -15,7 +15,7 @@
 void preset_gradient(struct ColourGradient* const grad)
 {
 	assert(grad);
-	size_t nPoints = 8;
+	size_t nPoints = 9;
 	ColourGradient_init(grad, nPoints);
 	grad->r.interpolation = grad->g.interpolation = grad->b.interpolation
 		= INTERP_SPLINE3;
@@ -34,21 +34,19 @@ void preset_gradient(struct ColourGradient* const grad)
 	COLOUR_SET(1, -8.5, 31, 0, 0);
 	COLOUR_SET(2, -6.5, 61, 13, 2);
 	COLOUR_SET(3, -5.5, 204, 34, 22);
-	COLOUR_SET(4, -3.5, 238, 191, 40);
-	COLOUR_SET(5, -2, 32, 194, 111);
-	COLOUR_SET(6, -1, 37, 105, 245);
-	COLOUR_SET(7, -0.5, 200, 170, 255);
+	COLOUR_SET(4, -4, 238, 191, 40);
+	COLOUR_SET(5, -3, 32, 194, 111);
+	COLOUR_SET(6, -2, 37, 105, 245);
+	COLOUR_SET(7, -1, 200, 170, 255);
 	COLOUR_SET(8, 0, 255, 255, 255);
 
-	/*
 	for (size_t i = 0; i < nPoints; ++i)
 	{
-		real fac = i / (real) nPoints;
+		real fac = 2.0 / (3.0 - i / (real) nPoints);
 		r[i] *= fac;
 		g[i] *= fac;
 		b[i] *= fac;
 	}
-	*/
 	memcpy(grad->g.x, x, sizeof(real) * nPoints);
 	memcpy(grad->b.x, x, sizeof(real) * nPoints);
 	ColourGradient_populate(grad);
