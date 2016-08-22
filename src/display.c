@@ -12,6 +12,7 @@ void Display_init(struct Display* const d)
 void Display_destroy(struct Display* const d)
 {
 	if (!d) return;
+	ColourGradient_destroy(&d->colourGradient);
 	SDL_DestroyMutex(d->pictQueueMutex);
 	SDL_DestroyCond(d->pictQueueCond);
 	sws_freeContext(d->swsContext);

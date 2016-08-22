@@ -15,8 +15,9 @@
  *  (see above). If not supplied, the routine uses an internally generated
  *  set of samples
  */
-bool static_sample_exec(struct Display* const d,
-                        char const* fileName,
-                        struct DSTFT* const);
+bool static_sample_exec(struct Display* const,
+                        struct DSTFT* const,
+                        char const* const fileName,
+                        size_t nSamplesIn);
 
 #endif // !SPECTROGEN__STATICSAMPLE_H_

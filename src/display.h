@@ -7,6 +7,8 @@
 #include <SDL2/SDL.h>
 #include <libswscale/swscale.h>
 
+#include "gradient.h"
+
 struct Picture
 {
 	uint8_t* planeY;
@@ -21,6 +23,7 @@ struct Display
 {
 	_Atomic bool quit;
 
+	struct ColourGradient colourGradient;
 	int width;
 	int height;
 	SDL_Window* window;

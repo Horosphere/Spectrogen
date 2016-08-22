@@ -9,6 +9,7 @@ struct SampleArray
 	real* samples;
 	size_t nSamples;
 	SDL_mutex* mutex;
+	_Atomic bool paused;
 };
 
 // This function's signature matches Pa_StreamCallback
@@ -21,6 +22,8 @@ int record_callback(float const* input, void* output, unsigned long nFrames,
 	(void) timeInfo;
 	(void) flags;
 
+	if (sa->paused) return paContinue;
+	
 	SDL_LockMutex(sa->mutex);
 	if (nFrames >= sa->nSamples)
 	{
@@ -77,7 +80,8 @@ int record_calculation_thread(struct CalculationData* const calculationData)
 		// Populate image
 		SDL_LockMutex(sa->mutex);
 		spectrogram_populate(image, d->width, d->height,
-		                     sa->samples, sa->nSamples, dstft);
+		                     sa->samples, sa->nSamples, &d->colourGradient,
+		                     dstft);
 		SDL_UnlockMutex(sa->mutex);
 
 		sws_scale(d->swsContext,
@@ -96,7 +100,8 @@ int record_calculation_thread(struct CalculationData* const calculationData)
 	free(image);
 	return 0;
 }
-void record_exec(struct Display* const d, struct DSTFT* const dstft)
+void record_exec(struct Display* const d, struct DSTFT* const dstft,
+			size_t nSamples)
 {
 	(void) d;
 	(void) dstft;
@@ -105,9 +110,10 @@ void record_exec(struct Display* const d, struct DSTFT* const dstft)
 
 
 	struct SampleArray sa;
-	sa.nSamples = 144000; // 2 secs
+	sa.nSamples = nSamples; // 2 secs
 	sa.samples = calloc(sizeof(real), sa.nSamples);
 	sa.mutex = SDL_CreateMutex();
+	sa.paused = false;
 
 	int paError = Pa_Initialize();
 	if (paError != paNoError)
@@ -148,6 +154,7 @@ void record_exec(struct Display* const d, struct DSTFT* const dstft)
 	SDL_CreateThread((SDL_ThreadFunction) record_calculation_thread,
 	                 "calculation", &calculationData);
 
+	
 	schedule_refresh(d, 40);
 	while ((paError = Pa_IsStreamActive(stream)) == 1)
 	{
@@ -164,6 +171,14 @@ void record_exec(struct Display* const d, struct DSTFT* const dstft)
 			break;
 		case EVENT_REFRESH:
 			refresh(event.user.data1);
+			break;
+		case SDL_KEYDOWN:
+			switch(event.key.keysym.sym)
+			{
+			case SDLK_SPACE:
+				sa.paused = !sa.paused;
+				break;
+			}
 			break;
 		default:
 			break;

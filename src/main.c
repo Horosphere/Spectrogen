@@ -1,13 +1,58 @@
-
+/*
+ * Main entry for Spectrogen
+ */
 #include <stdio.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include "display.h"
 #include "fourier.h"
 #include "staticsample.h"
 #include "record.h"
 
+#include "gradient.h"
 
+void preset_gradient(struct ColourGradient* const grad)
+{
+	assert(grad);
+	size_t nPoints = 8;
+	ColourGradient_init(grad, nPoints);
+	grad->r.interpolation = grad->g.interpolation = grad->b.interpolation
+		= INTERP_SPLINE3;
+
+	real* const r = grad->r.y;
+	real* const g = grad->g.y;
+	real* const b = grad->b.y;
+
+	real* const x = grad->r.x;
+	x[0] = 0.0;
+	r[0] = g[0] = b[0] = 0.0;
+
+	x[1] = 0.166;
+	r[1] = 61; g[1] = 13; b[1] = 2;
+
+	x[2] = 0.3;
+	r[2] = 204; g[2] = 34; b[2] = 22;
+
+	x[3] = 0.45;
+	r[3] = 238; g[3] = 191; b[3] = 40;
+
+	x[4] = 0.63;
+	r[4] = 32; g[4] = 194; b[4] = 111;
+
+	x[5] = 0.8;
+	r[5] = 37; g[5] = 105; b[5] = 245;
+
+	x[6] = 0.9;
+	r[6] = 179; g[6] = 109; b[6] = 255;
+
+	x[7] = 1.0;
+	r[7] = g[7] = b[7] = 255.0;
+	
+	memcpy(grad->g.x, x, sizeof(real) * nPoints);
+	memcpy(grad->b.x, x, sizeof(real) * nPoints);
+	ColourGradient_populate(grad);
+}
 int main(int argc, char* argv[])
 {
 	(void) argc;
@@ -20,6 +65,8 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "[SDL] %s\n", SDL_GetError());
 		return -1;
 	}
+
+	// Default values
 	struct Display display;
 	Display_init(&display);
 	display.width = 640;
@@ -43,6 +90,7 @@ int main(int argc, char* argv[])
 	memset(&dstft, 0, sizeof(struct DSTFT));
 	dstft.windowWidth = 1536;
 	char const* file = NULL;
+	size_t nSamples = 88200;
 
 	// Command line parser
 	char** arg= argv;
@@ -59,6 +107,7 @@ int main(int argc, char* argv[])
 		       "    WIDTH: Number of samples for the window.\n"
 		       "    VAR: Higher var indicates a narrower window. Ignored for rect"
 		       " and tri types\n"
+		       "--ns NSAMPLES: The number of samples for various routines\n"
 		       "Modes:\n"
 		       "(NO FLAG): Accept input from the microphone\n"
 		       "--file FILENAME: Read samples from a file. The first line must be"
@@ -125,6 +174,16 @@ int main(int argc, char* argv[])
 			file = *arg;
 			routineType = ROUTINE_STATIC;
 		}
+		else if (strcmp(*arg, "--ns") == 0)
+		{
+			if (++arg == argEnd || *arg[0] == '-')
+			{
+				fprintf(stderr, "A sample number must be provided");
+				return -1;
+			}
+			nSamples = atol(*arg);
+			routineType = ROUTINE_STATIC;
+		}
 		else if (strcmp(*arg, "--default") == 0)
 		{
 			file = NULL;
@@ -135,6 +194,11 @@ int main(int argc, char* argv[])
 			fprintf(stderr, "Unknown argument\n");
 			return -1;
 		}
+	}
+	if (nSamples < dstft.windowWidth)
+	{
+		fprintf(stderr, "Sample size cannot be smaller than the window width\n");
+		return -1;
 	}
 
 	// Parsing complete. Populate fields
@@ -149,6 +213,7 @@ int main(int argc, char* argv[])
 	                                    NULL, NULL, NULL);
 
 	Display_pictQueue_init(&display);
+	preset_gradient(&display.colourGradient);
 
 	DSTFT_init(&dstft);
 	switch (windowType)
@@ -170,10 +235,10 @@ int main(int argc, char* argv[])
 	switch (routineType)
 	{
 	case ROUTINE_STATIC:
-		static_sample_exec(&display, file, &dstft);
+		static_sample_exec(&display, &dstft, file, nSamples);
 		break;
 	case ROUTINE_RECORD:
-		record_exec(&display, &dstft);
+		record_exec(&display, &dstft, nSamples);
 		break;
 	}
 

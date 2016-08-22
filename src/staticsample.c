@@ -15,8 +15,9 @@
 
 
 bool static_sample_exec(struct Display* const d,
-                        char const* fileName,
-                        struct DSTFT* const dstft)
+                        struct DSTFT* const dstft,
+                        char const* const fileName,
+                        size_t nSamplesIn)
 {
 	real* samples = NULL;
 	size_t nSamples = 0;
@@ -64,14 +65,21 @@ bool static_sample_exec(struct Display* const d,
 	}
 	else
 	{
-		nSamples = 44100;
+		srand(clock());
+		nSamples = nSamplesIn;
 		samples = malloc(sizeof(real) * nSamples);
-		for (size_t i = 0; i < 44100 / 4; ++i)
+
+		size_t segmentWidth = dstft->windowWidth * 3;
+		fprintf(stdout, "Segment width: %ld\n", segmentWidth);
+		size_t nSegments = nSamples / segmentWidth;
+		for (size_t i = 0; i < nSegments; ++i)
 		{
-			samples[i] = sin(2 * M_PI * i / 88.2); // 500 Hz
-			samples[i + 44100 / 4] = sin(2 * M_PI * i / 22.05); // 2 kHz
-			samples[i + 2 * 44100 / 4] = sin(2 * M_PI * i / 7.35); // 6 kHz
-			samples[i + 3 * 44100 / 4] = sin(2 * M_PI * i / 2.01); //  22 kHz
+			real freq0 = rand() / (real) RAND_MAX;
+			real freq1 = rand() / (real) RAND_MAX;
+			for (size_t j = i * segmentWidth; j < (i + 1) * segmentWidth; ++j)
+			{
+				samples[j] = (cos(freq0 * j) + sin(freq1 * j));
+			}
 		}
 	}
 
@@ -81,7 +89,7 @@ bool static_sample_exec(struct Display* const d,
 
 	clock_t timeStart = clock();
 	spectrogram_populate(image, d->width, d->height,
-			samples, nSamples, dstft);
+	                     samples, nSamples, &d->colourGradient, dstft);
 
 	clock_t timeDiff = (clock() - timeStart) * 1000 / CLOCKS_PER_SEC;
 	fprintf(stdout, "Time elapsed: %ld ms\n", timeDiff);

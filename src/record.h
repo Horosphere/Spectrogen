@@ -9,6 +9,6 @@
 /**
  * Start recording audio and display the spectrogram in real time
  */
-void record_exec(struct Display* const, struct DSTFT* const);
+void record_exec(struct Display* const, struct DSTFT* const, size_t nSamples);
 
 #endif // !SPECTROGEN__RECORD_H_

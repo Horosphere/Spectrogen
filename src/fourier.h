@@ -6,12 +6,7 @@
 
 #include <fftw3.h>
 
-typedef double real;
-typedef double complex comp;
-
-#ifndef M_PI
-#define M_PI 3.141592653589793238462643383279502884197169399375105820974
-#endif
+#include "spectrogen.h"
 
 // All window functions result in a window with energy 1
 

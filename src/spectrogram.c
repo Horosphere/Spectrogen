@@ -5,7 +5,8 @@
 
 void spectrogram_populate(uint8_t* const image, int width, int height,
                           real const* const samples, size_t nSamples,
-                          struct DSTFT* dstft)
+                          struct ColourGradient const* const grad,
+                          struct DSTFT* const dstft)
 {
 	for (int col = 0; col < width; ++col)
 	{
@@ -43,11 +44,8 @@ void spectrogram_populate(uint8_t* const image, int width, int height,
 			 */
 			double amplitude = cabs(dstft->spectrum[j]) * 2;
 
-			uint8_t colour = (uint8_t) 255 * sqrt(amplitude);
 			int pixel = (col + row * width) * 3;
-			image[pixel + 0] = colour;
-			image[pixel + 1] = colour;
-			image[pixel + 2] = colour;
+			ColourGradient_eval(grad, amplitude, image + pixel);
 		}
 	}
 }
