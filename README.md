@@ -1,6 +1,9 @@
 # Spectrogen
 
-Discrete Short-time Fourier transform visualiser
+Discrete Short-time Fourier transform visualiser.
+
+![Record mode](/doc/record.png?raw=true "Record")
+![Static sample mode](/doc/record.png?raw=true "Static sample")
 
 ## Usage
 
