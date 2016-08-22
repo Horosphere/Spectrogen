@@ -166,6 +166,7 @@ void record_exec(struct Display* const d, struct DSTFT* const dstft,
 		{
 		case SDL_QUIT:
 			d->quit = true;
+			sa.paused = false;
 			paError = Pa_CloseStream(stream);
 			goto complete;
 			break;

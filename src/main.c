@@ -25,30 +25,30 @@ void preset_gradient(struct ColourGradient* const grad)
 	real* const b = grad->b.y;
 
 	real* const x = grad->r.x;
-	x[0] = 0.0;
+	x[0] = -12;
 	r[0] = g[0] = b[0] = 0.0;
 
-	x[1] = 0.166;
+	x[1] = -9;
 	r[1] = 61; g[1] = 13; b[1] = 2;
 
-	x[2] = 0.3;
+	x[2] = -7;
 	r[2] = 204; g[2] = 34; b[2] = 22;
 
-	x[3] = 0.45;
+	x[3] = -5;
 	r[3] = 238; g[3] = 191; b[3] = 40;
 
-	x[4] = 0.63;
+	x[4] = -3;
 	r[4] = 32; g[4] = 194; b[4] = 111;
 
-	x[5] = 0.8;
+	x[5] = -2;
 	r[5] = 37; g[5] = 105; b[5] = 245;
 
-	x[6] = 0.9;
+	x[6] = -1;
 	r[6] = 179; g[6] = 109; b[6] = 255;
 
-	x[7] = 1.0;
+	x[7] = 0;
 	r[7] = g[7] = b[7] = 255.0;
-	
+
 	memcpy(grad->g.x, x, sizeof(real) * nPoints);
 	memcpy(grad->b.x, x, sizeof(real) * nPoints);
 	ColourGradient_populate(grad);
@@ -182,7 +182,6 @@ int main(int argc, char* argv[])
 				return -1;
 			}
 			nSamples = atol(*arg);
-			routineType = ROUTINE_STATIC;
 		}
 		else if (strcmp(*arg, "--default") == 0)
 		{

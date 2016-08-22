@@ -42,7 +42,7 @@ void spectrogram_populate(uint8_t* const image, int width, int height,
 			/*
 			 * Must multiply amplitude by 2 so maximum amplitude is 1
 			 */
-			double amplitude = cabs(dstft->spectrum[j]) * 2;
+			double amplitude = log(cabs(dstft->spectrum[j]) * 2);
 
 			int pixel = (col + row * width) * 3;
 			ColourGradient_eval(grad, amplitude, image + pixel);

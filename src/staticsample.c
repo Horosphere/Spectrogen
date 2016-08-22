@@ -90,6 +90,16 @@ bool static_sample_exec(struct Display* const d,
 	clock_t timeStart = clock();
 	spectrogram_populate(image, d->width, d->height,
 	                     samples, nSamples, &d->colourGradient, dstft);
+	for (int i = 0; i < d->width; ++i)
+	{
+			double amp =  12 * (i / (real) d->width - 1.0);
+			//printf("%f\n", amp);
+		for (int j = d->height / 10; j < d->height / 7; ++j)
+		{
+			uint8_t* px = image + (i + j * d->width) * 3;
+			ColourGradient_eval(&d->colourGradient, amp, px);
+		}
+	}
 
 	clock_t timeDiff = (clock() - timeStart) * 1000 / CLOCKS_PER_SEC;
 	fprintf(stdout, "Time elapsed: %ld ms\n", timeDiff);

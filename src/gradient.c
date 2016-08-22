@@ -50,7 +50,7 @@ void Gradient_populate(struct Gradient* const g)
 		real div = 1 / (g->x[1] - g->x[0]);
 		mat[0][0] = 2 * div;
 		mat[0][1] = div;
-		d[0] = 3 * (g->y[1] - g->y[0]) / (div * div);
+		d[0] = 3 * (g->y[1] - g->y[0]) * (div * div);
 	}
 	for (size_t i = 1; i < n - 1; ++i)
 	{
@@ -65,14 +65,19 @@ void Gradient_populate(struct Gradient* const g)
 		            ((g->y[i + 1] - g->y[i]) * (divR * divR)));
 	}
 	{
-		real div = 1 / (g->x[n - 1] - g->x[n]);
+		real div = 1 / (g->x[n - 1] - g->x[n - 2]);
 		mat[n - 1][n - 2] = div;
 		mat[n - 1][n - 1] = 2 * div;
 		d[n - 1] = 3 * (g->y[n - 1] - g->y[n - 2]) * (div * div);
 	}
 
-	matrix_inverse(mat, n);
+	bool invertible = matrix_inverse(mat, n);
+	(void) invertible; assert(invertible);
+
 	matrix_vector_multiply(d, (real const* const* const) mat, n);
+	for (size_t i = 0; i < n; ++i)
+		free(mat[i]);
+	free(mat);
 }
 real Gradient_eval(struct Gradient const* const g, real x)
 {
@@ -150,12 +155,18 @@ void ColourGradient_populate(struct ColourGradient* const g)
 	Gradient_populate(&g->g);
 	Gradient_populate(&g->b);
 }
+uint8_t real_to_colour(real val)
+{
+	if (val < 0.0) return 0;
+	else if (val > 255.0) return 255;
+	else return (uint8_t) val;
+}
 void ColourGradient_eval(struct ColourGradient const* const g,
                          real x, uint8_t colour[3])
 {
 	assert(g);
 	assert(colour);
-	colour[0] = (uint8_t) Gradient_eval(&g->r, x);
-	colour[1] = (uint8_t) Gradient_eval(&g->g, x);
-	colour[2] = (uint8_t) Gradient_eval(&g->b, x);
+	colour[0] = real_to_colour(Gradient_eval(&g->r, x));
+	colour[1] = real_to_colour(Gradient_eval(&g->g, x));
+	colour[2] = real_to_colour(Gradient_eval(&g->b, x));
 }
