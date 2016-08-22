@@ -31,7 +31,7 @@ void preset_gradient(struct ColourGradient* const grad)
 	r[index] = red; g[index] = green; b[index] = blue;
 
 	COLOUR_SET(0, -12, 0.0, 0.0, 0.0);
-	COLOUR_SET(1, -8.5, 31, 0, 0);
+	COLOUR_SET(1, -7.2, 31, 0, 0);
 	COLOUR_SET(2, -6.5, 61, 13, 2);
 	COLOUR_SET(3, -5.5, 204, 34, 22);
 	COLOUR_SET(4, -4, 238, 191, 40);

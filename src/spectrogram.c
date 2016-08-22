@@ -44,11 +44,16 @@ void spectrogram_populate(uint8_t* const image, int width, int height,
 		{
 			/*
 			 * (height - row) flips the spectrogram upside down
-			 * a linear map casts [0, height] to [0, windowRadius]. The +1 avoids
+			 * a nonlinear map casts [0, height] to [0, windowRadius]. The +1 avoids
 			 * the constant term and allows the highest component of frequency to be
 			 * shown.
 			 */
-			size_t j = (height - row) * dstft->windowRadius / height + 1;
+			real t = (height - row) / (real) height;
+#ifdef SPECTROGRAM_LOGARITHMIC
+			size_t j = (pow(2, t) - 1) * dstft->windowRadius + 1;
+#else
+			size_t j = t * dstft->windowRadius + 1;
+#endif
 			/*
 			 * Must multiply amplitude by 2 so maximum amplitude is 1
 			 */

@@ -7,7 +7,10 @@
 #include "fourier.h"
 #include "gradient.h"
 
+#define SPECTROGRAM_LOGARITHMIC
+
 /**
+ * Define SPECTROGRAM_LOGARITHMIC to draw logarithmic graph
  * @brief Converts the samples to a spectrogram
  * @param[out] image An array of size 3 * width * height in the RGB888, width
  *	major format for storing the pixels.
