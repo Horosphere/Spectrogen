@@ -5,27 +5,34 @@
 
 void spectrogram_populate(uint8_t* const image, int width, int height,
                           real const* const samples, size_t nSamples,
+                          bool crop,
                           struct ColourGradient const* const grad,
                           struct DSTFT* const dstft)
 {
+	memset(dstft->buffer, 0, sizeof(real) * dstft->windowWidth);
+
+	size_t n = crop ? nSamples - dstft->windowWidth : nSamples;
+	size_t offset = crop ? dstft->windowRadius : 0;
 	for (int col = 0; col < width; ++col)
 	{
-		size_t i = col * nSamples / width;
-		if (i < dstft->windowRadius)
+		size_t i = col * n / (real) width + offset;
+		if (crop || (i >= dstft->windowRadius &&
+		             i + dstft->windowRadius <= nSamples))
+		{
+			memcpy(dstft->buffer, samples + i - dstft->windowRadius,
+			       sizeof(real) * dstft->windowWidth);
+		}
+		else if (i < dstft->windowRadius)
 		{
 			memcpy(dstft->buffer + dstft->windowRadius - i, samples,
 			       sizeof(real) * (dstft->windowRadius + i));
 		}
-		else if (i + dstft->windowRadius > nSamples)
+		else // if (i + dstft->windowRadius > nSamples)
 		{
-			dstft->buffer[nSamples - i + dstft->windowRadius - 1] = 0;
+			memset(dstft->buffer + dstft->windowRadius + nSamples - i, 0,
+			       sizeof(real) * (dstft->windowRadius + i - nSamples));
 			memcpy(dstft->buffer, samples + i - dstft->windowRadius,
 			       sizeof(real) * (dstft->windowRadius + nSamples - i));
-		}
-		else
-		{
-			memcpy(dstft->buffer, samples + i - dstft->windowRadius,
-					sizeof(real) * dstft->windowWidth);
 		}
 		convolve(dstft->buffer, dstft->window, dstft->windowWidth);
 		fftw_execute(dstft->plan);

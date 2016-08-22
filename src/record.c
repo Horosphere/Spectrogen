@@ -80,7 +80,7 @@ int record_calculation_thread(struct CalculationData* const calculationData)
 		// Populate image
 		SDL_LockMutex(sa->mutex);
 		spectrogram_populate(image, d->width, d->height,
-		                     sa->samples, sa->nSamples, &d->colourGradient,
+		                     sa->samples, sa->nSamples, true, &d->colourGradient,
 		                     dstft);
 		SDL_UnlockMutex(sa->mutex);
 

@@ -2,12 +2,14 @@
 #define SPECTROGEN__SPECTROGRAM_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "fourier.h"
 #include "gradient.h"
 
 void spectrogram_populate(uint8_t* const image, int width, int height,
                           real const* const samples, size_t nSamples,
+                          bool crop,
                           struct ColourGradient const* const,
                           struct DSTFT* const);
 

@@ -89,7 +89,7 @@ bool static_sample_exec(struct Display* const d,
 
 	clock_t timeStart = clock();
 	spectrogram_populate(image, d->width, d->height,
-	                     samples, nSamples, &d->colourGradient, dstft);
+	                     samples, nSamples, false, &d->colourGradient, dstft);
 	for (int i = 0; i < d->width; ++i)
 	{
 			double amp =  12 * (i / (real) d->width - 1.0);

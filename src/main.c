@@ -25,30 +25,30 @@ void preset_gradient(struct ColourGradient* const grad)
 	real* const b = grad->b.y;
 
 	real* const x = grad->r.x;
-	x[0] = -12;
-	r[0] = g[0] = b[0] = 0.0;
 
-	x[1] = -9;
-	r[1] = 61; g[1] = 13; b[1] = 2;
+#define COLOUR_SET(index, t, red, green, blue) \
+	x[index] = t; \
+	r[index] = red; g[index] = green; b[index] = blue;
 
-	x[2] = -7;
-	r[2] = 204; g[2] = 34; b[2] = 22;
+	COLOUR_SET(0, -12, 0.0, 0.0, 0.0);
+	COLOUR_SET(1, -8.5, 31, 0, 0);
+	COLOUR_SET(2, -6.5, 61, 13, 2);
+	COLOUR_SET(3, -5.5, 204, 34, 22);
+	COLOUR_SET(4, -3.5, 238, 191, 40);
+	COLOUR_SET(5, -2, 32, 194, 111);
+	COLOUR_SET(6, -1, 37, 105, 245);
+	COLOUR_SET(7, -0.5, 200, 170, 255);
+	COLOUR_SET(8, 0, 255, 255, 255);
 
-	x[3] = -5;
-	r[3] = 238; g[3] = 191; b[3] = 40;
-
-	x[4] = -3;
-	r[4] = 32; g[4] = 194; b[4] = 111;
-
-	x[5] = -2;
-	r[5] = 37; g[5] = 105; b[5] = 245;
-
-	x[6] = -1;
-	r[6] = 179; g[6] = 109; b[6] = 255;
-
-	x[7] = 0;
-	r[7] = g[7] = b[7] = 255.0;
-
+	/*
+	for (size_t i = 0; i < nPoints; ++i)
+	{
+		real fac = i / (real) nPoints;
+		r[i] *= fac;
+		g[i] *= fac;
+		b[i] *= fac;
+	}
+	*/
 	memcpy(grad->g.x, x, sizeof(real) * nPoints);
 	memcpy(grad->b.x, x, sizeof(real) * nPoints);
 	ColourGradient_populate(grad);
